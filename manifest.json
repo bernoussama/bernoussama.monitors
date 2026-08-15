@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "oussama.monitors",
+  "id": "bernoussama.monitors",
   "name": "Monitor Layout",
   "version": "1.0.0",
-  "author": "oussama",
+  "author": "bernoussama",
   "description": "Draggable 2D editor for Hyprland monitor positions",
   "kinds": ["overlay"],
   "entryPoints": {

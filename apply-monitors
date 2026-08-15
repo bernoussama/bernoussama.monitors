@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# oussama.monitors: apply Hyprland monitor positions live, then persist them
+# bernoussama.monitors: apply Hyprland monitor positions live, then persist them
 # to ~/.config/hypr/monitors.lua as a managed block.
 #
 # usage: apply-monitors '[{"name":"DP-1","x":1920,"y":540}, ...]'
@@ -58,31 +58,25 @@ fi
 
 # Persist: managed block at the end of monitors.lua. Later rules override the
 # catch-all above, so the explicit positions win for listed outputs.
-#
-# The whole edit must land as ONE atomic rename. An in-place edit (sed -i plus
-# append) briefly leaves the file without the block; Hyprland watches the file,
-# reloads that intermediate state, and the catch-all `position = "auto"` rule
-# reverts the layout the evals just applied.
-if [[ -f $monitor_lua && ! -f ${monitor_lua}.oussama-monitors.bak ]]; then
-  cp "$monitor_lua" "$monitor_lua.oussama-monitors.bak"
+if [[ -f $monitor_lua && ! -f ${monitor_lua}.bernoussama-monitors.bak ]]; then
+  cp "$monitor_lua" "$monitor_lua.bernoussama-monitors.bak"
 fi
 touch "$monitor_lua"
 tmp="$(mktemp "${monitor_lua}.tmp.XXXXXX")"
-awk '/^-- oussama\.monitors BEGIN/{skip=1} /^-- oussama\.monitors END$/{skip=0; next} !skip' "$monitor_lua" >"$tmp"
+awk '/^-- (oussama|bernoussama)\.monitors BEGIN/{skip=1} /^-- (oussama|bernoussama)\.monitors END$/{skip=0; next} !skip' "$monitor_lua" >"$tmp"
 {
   echo ""
-  echo "-- oussama.monitors BEGIN (managed by the oussama.monitors shell plugin; edits are overwritten)"
+  echo "-- bernoussama.monitors BEGIN (managed by the bernoussama.monitors shell plugin; edits are overwritten)"
   while IFS=$'\t' read -r name x y; do
     [[ -n $name ]] || continue
     line="$(monitor_lua_line "$name" "$x" "$y")" || continue
     printf '%s\n' "$line"
   done <<<"$entries"
-  echo "-- oussama.monitors END"
+  echo "-- bernoussama.monitors END"
 } >>"$tmp"
 mv "$tmp" "$monitor_lua"
 
-# Force Hyprland to read the final file; the rename may not retrigger its
-# watcher (it can keep watching the replaced inode), leaving stale rules live.
+# Force Hyprland to read the final file.
 hyprctl reload >/dev/null
 
 echo "applied $applied monitor(s)"

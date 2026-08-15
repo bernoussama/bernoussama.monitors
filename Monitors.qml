@@ -6,7 +6,7 @@ import qs.Commons
 import qs.Ui
 
 // Draggable 2D layout editor for Hyprland monitor positions.
-// Summon with `omarchy-shell shell toggle oussama.monitors`.
+// Summon with `omarchy-shell shell toggle bernoussama.monitors`.
 Item {
   id: root
 
@@ -51,7 +51,7 @@ Item {
   function dismiss() {
     root.opened = false
     if (root.shell && typeof root.shell.hide === "function")
-      root.shell.hide((root.manifest && root.manifest.id) || "oussama.monitors")
+      root.shell.hide((root.manifest && root.manifest.id) || "bernoussama.monitors")
   }
 
   function toggle() {
@@ -223,7 +223,7 @@ Item {
     visible: root.opened
     anchors { top: true; bottom: true; left: true; right: true }
     color: "transparent"
-    WlrLayershell.namespace: "oussama-monitors"
+    WlrLayershell.namespace: "bernoussama-monitors"
     WlrLayershell.layer: WlrLayer.Overlay
     WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
     exclusionMode: ExclusionMode.Ignore

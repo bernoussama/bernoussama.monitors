@@ -1,8 +1,8 @@
-# omarchy-monitors
+# bernoussama.monitors
 
 > Draggable 2D layout editor for Hyprland monitor positions on Omarchy Linux.
 
-`omarchy-monitors` is an overlay plugin for the Omarchy status bar / shell (`omarchy-shell` / Quickshell). It provides an intuitive, visual way to drag, snap, and arrange multiple displays in 2D space and save the layout directly to Hyprland.
+`bernoussama.monitors` is an overlay plugin for the Omarchy status bar / shell (`omarchy-shell` / Quickshell). It provides an intuitive, visual way to drag, snap, and arrange multiple displays in 2D space and save the layout directly to Hyprland.
 
 ```
 +----------------------------------------------------------------+
@@ -39,22 +39,22 @@
 ### One-line Installation
 
 ```bash
-bash <(curl -sSL https://raw.githubusercontent.com/bernoussama/omarchy-monitors/main/install.sh)
+bash <(curl -sSL https://raw.githubusercontent.com/bernoussama/bernoussama.monitors/main/install.sh)
 ```
 
 ### Manual Installation
 
 1. Clone this repository into your Omarchy user plugins directory:
    ```bash
-   git clone https://github.com/bernoussama/omarchy-monitors.git ~/.config/omarchy/plugins/oussama.monitors
-   chmod +x ~/.config/omarchy/plugins/oussama.monitors/apply-monitors
+   git clone https://github.com/bernoussama/bernoussama.monitors.git ~/.config/omarchy/plugins/bernoussama.monitors
+   chmod +x ~/.config/omarchy/plugins/bernoussama.monitors/apply-monitors
    ```
 
 2. Register the plugin in `~/.config/omarchy/shell.json`:
    ```json
    {
      "plugins": [
-       { "id": "oussama.monitors" }
+       { "id": "bernoussama.monitors" }
      ]
    }
    ```
@@ -73,7 +73,7 @@ bash <(curl -sSL https://raw.githubusercontent.com/bernoussama/omarchy-monitors/
 Toggle the editor overlay at any time:
 
 ```bash
-omarchy-shell shell toggle oussama.monitors
+omarchy-shell shell toggle bernoussama.monitors
 ```
 
 ### Recommended Keybinding
@@ -83,7 +83,7 @@ Add a convenient keybinding in `~/.config/hypr/bindings.lua`:
 ```lua
 -- Open Monitor Layout Editor with Super + Shift + M
 o.bind("Super+Shift", "M", function()
-  hl.exec("omarchy-shell shell toggle oussama.monitors")
+  hl.exec("omarchy-shell shell toggle bernoussama.monitors")
 end)
 ```
 
@@ -104,7 +104,7 @@ end)
 1. **Overlay (`Monitors.qml`)**:
    Runs inside `omarchy-shell` (Quickshell). Reads live state from `hyprctl monitors -j` and renders the interactive canvas.
 2. **Apply Script (`apply-monitors`)**:
-   Receives the JSON array of monitor coordinates, executes `hyprctl eval` for live updates, and atomically rewrites the `-- oussama.monitors BEGIN` block in `~/.config/hypr/monitors.lua`.
+   Receives the JSON array of monitor coordinates, executes `hyprctl eval` for live updates, and atomically rewrites the `-- bernoussama.monitors BEGIN` block in `~/.config/hypr/monitors.lua`.
 
 ---
 
