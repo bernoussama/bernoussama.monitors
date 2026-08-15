@@ -95,6 +95,7 @@ Item {
       if (m.focused) selIdx = monitorModel.count
 
       monitorModel.append({
+        itemIndex: monitorModel.count,
         name: String(m.name),
         desc: String(m.description || m.model || m.name),
         posX: Math.round(Number(m.x) || 0),
@@ -120,10 +121,21 @@ Item {
     }
     if (monitorModel.count > 0) {
       if (selIdx >= monitorModel.count) selIdx = 0
-      root.selectedIndex = selIdx
+      root.selectMonitor(selIdx)
     }
     root.syncMovedCount()
     root.recomputeView()
+  }
+
+  function selectMonitor(idx) {
+    if (idx < 0 || idx >= monitorModel.count) return
+    root.selectedIndex = idx
+    var m = monitorModel.get(idx)
+    if (m) {
+      resWField.text = String(m.width)
+      resHField.text = String(m.height)
+      rrField.text = String(m.refreshRate)
+    }
   }
 
   function checkMonitorMoved(index) {
@@ -547,7 +559,7 @@ Item {
               Rectangle {
                 id: monRect
 
-                required property int index
+                required property int itemIndex
                 required property string name
                 required property int posX
                 required property int posY
@@ -560,7 +572,7 @@ Item {
                 required property bool focused
                 required property bool locked
                 required property bool moved
-                readonly property bool isSelected: root.selectedIndex === monRect.index
+                readonly property bool isSelected: root.selectedIndex === monRect.itemIndex
 
                 x: root.viewPad + (monRect.posX - root.viewMinX) * root.viewK
                 y: root.viewPad + (monRect.posY - root.viewMinY) * root.viewK
@@ -596,7 +608,7 @@ Item {
                   property real startLy
 
                   onPressed: function(mouse) {
-                    root.selectedIndex = monRect.index
+                    root.selectMonitor(monRect.itemIndex)
                     grabMx = mouse.x
                     grabMy = mouse.y
                     startLx = monRect.posX
@@ -607,13 +619,13 @@ Item {
                     if (!pressed) return
                     var nx = root.fixXAxis ? startLx : Math.round(startLx + (mouse.x - grabMx) / root.viewK)
                     var ny = Math.round(startLy + (mouse.y - grabMy) / root.viewK)
-                    monitorModel.setProperty(monRect.index, "posX", nx)
-                    monitorModel.setProperty(monRect.index, "posY", ny)
+                    monitorModel.setProperty(monRect.itemIndex, "posX", nx)
+                    monitorModel.setProperty(monRect.itemIndex, "posY", ny)
                     root.extendViewOrigin(nx, ny)
                   }
 
                   onReleased: {
-                    root.snapMonitor(monRect.index)
+                    root.snapMonitor(monRect.itemIndex)
                     root.recomputeView()
                   }
                 }
