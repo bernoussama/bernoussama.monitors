@@ -18,6 +18,7 @@ Item {
   property bool applying: false
   property string statusText: ""
   property int movedCount: 0
+  property bool fixXAxis: true
   property string fontFamily: Style.font.menuFamily
 
   property color background: Color.menu.background
@@ -160,8 +161,8 @@ Item {
         if (dya < dy) { dy = dya; bestY = yc[b] }
       }
     }
-    var nx = (bestX !== null && dx <= root.snapThreshold)
-      ? bestX : Math.round(m.posX / root.gridStep) * root.gridStep
+    var nx = root.fixXAxis ? m.origX : ((bestX !== null && dx <= root.snapThreshold)
+      ? bestX : Math.round(m.posX / root.gridStep) * root.gridStep)
     var ny = (bestY !== null && dy <= root.snapThreshold)
       ? bestY : Math.round(m.posY / root.gridStep) * root.gridStep
     monitorModel.setProperty(index, "posX", nx)
@@ -369,7 +370,7 @@ Item {
               right: parent.right
               topMargin: Style.space(10)
             }
-            height: layoutLabel.implicitHeight + Style.space(10)
+            height: Math.max(layoutLabel.implicitHeight, fixXRow.implicitHeight, syncText.implicitHeight)
 
             PanelSectionHeader {
               id: layoutLabel
@@ -380,7 +381,30 @@ Item {
               anchors.verticalCenter: parent.verticalCenter
             }
 
+            Row {
+              id: fixXRow
+              anchors.right: syncText.left
+              anchors.rightMargin: Style.space(14)
+              anchors.verticalCenter: parent.verticalCenter
+              spacing: Style.space(6)
+
+              Text {
+                text: "Lock X axis"
+                color: root.fixXAxis ? root.foreground : root.dimmed
+                font.family: root.fontFamily
+                font.pixelSize: Style.font.caption
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              ToggleSwitch {
+                checked: root.fixXAxis
+                onToggled: root.fixXAxis = !root.fixXAxis
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+
             Text {
+              id: syncText
               text: root.movedCount > 0 ? root.movedCount + " moved" : "in sync"
               color: root.movedCount > 0 ? Color.accent : root.dimmed
               font.family: root.fontFamily
@@ -462,7 +486,7 @@ Item {
                   id: dragArea
                   anchors.fill: parent
                   enabled: !monRect.locked
-                  cursorShape: monRect.locked ? Qt.ForbiddenCursor : Qt.SizeAllCursor
+                  cursorShape: monRect.locked ? Qt.ForbiddenCursor : (root.fixXAxis ? Qt.SizeVerCursor : Qt.SizeAllCursor)
                   hoverEnabled: true
 
                   property real grabMx
@@ -479,7 +503,7 @@ Item {
 
                   onPositionChanged: function(mouse) {
                     if (!pressed) return
-                    var nx = Math.round(startLx + (mouse.x - grabMx) / root.viewK)
+                    var nx = root.fixXAxis ? startLx : Math.round(startLx + (mouse.x - grabMx) / root.viewK)
                     var ny = Math.round(startLy + (mouse.y - grabMy) / root.viewK)
                     monitorModel.setProperty(monRect.index, "posX", nx)
                     monitorModel.setProperty(monRect.index, "posY", ny)
