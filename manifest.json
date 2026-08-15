@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "oussama.monitors",
+  "name": "Monitor Layout",
+  "version": "1.0.0",
+  "author": "oussama",
+  "description": "Draggable 2D editor for Hyprland monitor positions",
+  "kinds": ["overlay"],
+  "entryPoints": {
+    "overlay": "Monitors.qml"
+  }
+}

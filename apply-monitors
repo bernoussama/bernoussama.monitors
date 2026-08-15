@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# oussama.monitors: apply Hyprland monitor positions live, then persist them
+# to ~/.config/hypr/monitors.lua as a managed block.
+#
+# usage: apply-monitors '[{"name":"DP-1","x":1920,"y":540}, ...]'
+# Mode, scale, and transform are re-read from `hyprctl monitors -j` so the
+# live state stays the single source of truth.
+set -euo pipefail
+
+payload="${1:-}"
+if [[ -z $payload || $payload != \[* ]]; then
+  echo "usage: apply-monitors '[{\"name\":\"DP-1\",\"x\":1920,\"y\":540},...]'" >&2
+  exit 1
+fi
+
+monitor_lua="$HOME/.config/hypr/monitors.lua"
+state_json="$(hyprctl monitors -j)"
+
+# hyprctl reports the effective (transformed) size; mode strings need native.
+# Emits the hl.monitor(...) lua for one monitor at the given logical position.
+monitor_lua_line() {
+  local name="$1" x="$2" y="$3"
+  local info w h scale rr transform t lua
+
+  info="$(printf '%s' "$state_json" | jq -er --arg n "$name" '.[] | select(.name == $n)' 2>/dev/null)" || {
+    echo "# monitor not found: $name" >&2
+    return 1
+  }
+  if [[ $(jq -r '.mirrorOf // "none"' <<<"$info") != "none" ]]; then
+    # Mirrored monitors follow their source; re-applying would unmirror them.
+    return 1
+  fi
+
+  read -r w h scale rr transform <<<"$(jq -r '[.width, .height, .scale, .refreshRate, (.transform // 0)] | @tsv' <<<"$info")"
+  if (( transform % 2 == 1 )); then t=$w; w=$h; h=$t; fi
+  rr="$(printf '%g' "$rr")"
+
+  lua="hl.monitor({ output = \"$name\", mode = \"${w}x${h}@${rr}\", position = \"${x}x${y}\", scale = ${scale}"
+  if (( transform != 0 )); then lua+=", transform = $transform"; fi
+  lua+=" })"
+  printf '%s\n' "$lua"
+}
+
+entries="$(jq -r '.[] | [.name, (.x | floor), (.y | floor)] | @tsv' <<<"$payload")"
+
+applied=0
+while IFS=$'\t' read -r name x y; do
+  [[ -n $name ]] || continue
+  line="$(monitor_lua_line "$name" "$x" "$y")" || continue
+  hyprctl eval "$line" >/dev/null
+  applied=$((applied + 1))
+done <<<"$entries"
+
+if (( applied == 0 )); then
+  echo "no monitors applied" >&2
+  exit 1
+fi
+
+# Persist: managed block at the end of monitors.lua. Later rules override the
+# catch-all above, so the explicit positions win for listed outputs.
+#
+# The whole edit must land as ONE atomic rename. An in-place edit (sed -i plus
+# append) briefly leaves the file without the block; Hyprland watches the file,
+# reloads that intermediate state, and the catch-all `position = "auto"` rule
+# reverts the layout the evals just applied.
+if [[ -f $monitor_lua && ! -f ${monitor_lua}.oussama-monitors.bak ]]; then
+  cp "$monitor_lua" "$monitor_lua.oussama-monitors.bak"
+fi
+touch "$monitor_lua"
+tmp="$(mktemp "${monitor_lua}.tmp.XXXXXX")"
+awk '/^-- oussama\.monitors BEGIN/{skip=1} /^-- oussama\.monitors END$/{skip=0; next} !skip' "$monitor_lua" >"$tmp"
+{
+  echo ""
+  echo "-- oussama.monitors BEGIN (managed by the oussama.monitors shell plugin; edits are overwritten)"
+  while IFS=$'\t' read -r name x y; do
+    [[ -n $name ]] || continue
+    line="$(monitor_lua_line "$name" "$x" "$y")" || continue
+    printf '%s\n' "$line"
+  done <<<"$entries"
+  echo "-- oussama.monitors END"
+} >>"$tmp"
+mv "$tmp" "$monitor_lua"
+
+# Force Hyprland to read the final file; the rename may not retrigger its
+# watcher (it can keep watching the replaced inode), leaving stale rules live.
+hyprctl reload >/dev/null
+
+echo "applied $applied monitor(s)"
