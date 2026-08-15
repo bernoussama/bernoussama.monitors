@@ -26,8 +26,11 @@
 ## Features
 
 - **2D Visual Arrangement**: Drag display cards freely across the canvas to set logical positions.
+- **Lock X-Axis Toggle**: Constrain movement to vertical-only (Y-axis) alignment with one click.
+- **Display Properties Editor**: Inspect and edit resolution (Width × Height) and refresh rate (Hz) for any selected monitor.
+- **Hardware Mode Presets**: Select supported resolutions and refresh rates from auto-detected device modes (`availableModes`).
 - **Edge & Alignment Snapping**: Snaps adjacent display edges together and aligns top/bottom borders.
-- **Live Hyprland IPC Application**: Instantly applies new monitor positions via `hyprctl` without restarting applications.
+- **Live Hyprland IPC Application**: Instantly applies new monitor positions and modes via `hyprctl` without restarting applications.
 - **Atomic Configuration Persistence**: Safely saves the layout into `~/.config/hypr/monitors.lua` using an isolated managed block.
 - **HiDPI & Scale Aware**: Correctly handles fractional scaling and transformed (rotated) monitors.
 - **Native Omarchy Look & Feel**: Follows Omarchy theme colors, typography, borders, and animations.

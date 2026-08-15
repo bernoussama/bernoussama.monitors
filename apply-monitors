@@ -19,7 +19,7 @@ state_json="$(hyprctl monitors -j)"
 # hyprctl reports the effective (transformed) size; mode strings need native.
 # Emits the hl.monitor(...) lua for one monitor at the given logical position.
 monitor_lua_line() {
-  local name="$1" x="$2" y="$3"
+  local name="$1" x="$2" y="$3" req_w="${4:-}" req_h="${5:-}" req_rr="${6:-}" req_scale="${7:-}"
   local info w h scale rr transform t lua
 
   info="$(printf '%s' "$state_json" | jq -er --arg n "$name" '.[] | select(.name == $n)' 2>/dev/null)" || {
@@ -32,6 +32,11 @@ monitor_lua_line() {
   fi
 
   read -r w h scale rr transform <<<"$(jq -r '[.width, .height, .scale, .refreshRate, (.transform // 0)] | @tsv' <<<"$info")"
+  if [[ -n $req_w && $req_w != "null" && $req_w != "0" ]]; then w="$req_w"; fi
+  if [[ -n $req_h && $req_h != "null" && $req_h != "0" ]]; then h="$req_h"; fi
+  if [[ -n $req_rr && $req_rr != "null" && $req_rr != "0" ]]; then rr="$req_rr"; fi
+  if [[ -n $req_scale && $req_scale != "null" && $req_scale != "0" ]]; then scale="$req_scale"; fi
+
   if (( transform % 2 == 1 )); then t=$w; w=$h; h=$t; fi
   rr="$(printf '%g' "$rr")"
 
@@ -41,12 +46,12 @@ monitor_lua_line() {
   printf '%s\n' "$lua"
 }
 
-entries="$(jq -r '.[] | [.name, (.x | floor), (.y | floor)] | @tsv' <<<"$payload")"
+entries="$(jq -r '.[] | [.name, (.x | floor), (.y | floor), (.width // "" | tostring), (.height // "" | tostring), (.refreshRate // "" | tostring), (.scale // "" | tostring)] | @tsv' <<<"$payload")"
 
 applied=0
-while IFS=$'\t' read -r name x y; do
+while IFS=$'\t' read -r name x y w h rr scale; do
   [[ -n $name ]] || continue
-  line="$(monitor_lua_line "$name" "$x" "$y")" || continue
+  line="$(monitor_lua_line "$name" "$x" "$y" "$w" "$h" "$rr" "$scale")" || continue
   hyprctl eval "$line" >/dev/null
   applied=$((applied + 1))
 done <<<"$entries"
@@ -67,9 +72,9 @@ awk '/^-- (oussama|bernoussama)\.monitors BEGIN/{skip=1} /^-- (oussama|bernoussa
 {
   echo ""
   echo "-- bernoussama.monitors BEGIN (managed by the bernoussama.monitors shell plugin; edits are overwritten)"
-  while IFS=$'\t' read -r name x y; do
+  while IFS=$'\t' read -r name x y w h rr scale; do
     [[ -n $name ]] || continue
-    line="$(monitor_lua_line "$name" "$x" "$y")" || continue
+    line="$(monitor_lua_line "$name" "$x" "$y" "$w" "$h" "$rr" "$scale")" || continue
     printf '%s\n' "$line"
   done <<<"$entries"
   echo "-- bernoussama.monitors END"

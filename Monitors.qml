@@ -19,6 +19,8 @@ Item {
   property string statusText: ""
   property int movedCount: 0
   property bool fixXAxis: true
+  property int selectedIndex: 0
+  readonly property var selectedMonitor: (selectedIndex >= 0 && selectedIndex < monitorModel.count) ? monitorModel.get(selectedIndex) : null
   property string fontFamily: Style.font.menuFamily
 
   property color background: Color.menu.background
@@ -74,29 +76,91 @@ Item {
     var list = []
     try { list = JSON.parse(String(raw || "[]")) } catch (e) { list = [] }
     monitorModel.clear()
+    var selIdx = 0
     for (var i = 0; i < list.length; i++) {
       var m = list[i]
       if (!m || !m.name) continue
       var scale = Number(m.scale) || 1
+      var w = Number(m.width) || 1920
+      var h = Number(m.height) || 1080
+      var rr = Math.round((Number(m.refreshRate) || 60) * 100) / 100
+      var modes = Array.isArray(m.availableModes) ? m.availableModes : []
+      if (m.focused) selIdx = monitorModel.count
+
       monitorModel.append({
         name: String(m.name),
-        desc: String(m.description || ""),
+        desc: String(m.description || m.model || m.name),
         posX: Math.round(Number(m.x) || 0),
         posY: Math.round(Number(m.y) || 0),
         origX: Math.round(Number(m.x) || 0),
         origY: Math.round(Number(m.y) || 0),
-        lw: Math.round((Number(m.width) || 0) / scale),
-        lh: Math.round((Number(m.height) || 0) / scale),
+        width: w,
+        height: h,
+        origWidth: w,
+        origHeight: h,
+        lw: Math.round(w / scale),
+        lh: Math.round(h / scale),
         scaleFactor: scale,
-        refreshRate: Math.round((Number(m.refreshRate) || 0) * 100) / 100,
+        origScale: scale,
+        refreshRate: rr,
+        origRefreshRate: rr,
+        availableModes: modes,
         transformValue: Number(m.transform) || 0,
         focused: m.focused === true,
         locked: String(m.mirrorOf || "none") !== "none",
         moved: false
       })
     }
+    if (monitorModel.count > 0) {
+      if (selIdx >= monitorModel.count) selIdx = 0
+      root.selectedIndex = selIdx
+    }
     root.syncMovedCount()
     root.recomputeView()
+  }
+
+  function checkMonitorMoved(index) {
+    var m = monitorModel.get(index)
+    if (!m) return
+    var isMoved = (m.posX !== m.origX || m.posY !== m.origY
+      || m.width !== m.origWidth || m.height !== m.origHeight
+      || m.refreshRate !== m.origRefreshRate || m.scaleFactor !== m.origScale)
+    monitorModel.setProperty(index, "moved", isMoved)
+    root.syncMovedCount()
+  }
+
+  function setMonitorResolution(index, w, h) {
+    var m = monitorModel.get(index)
+    if (!m || m.locked) return
+    var nw = Math.max(320, parseInt(w) || m.origWidth)
+    var nh = Math.max(240, parseInt(h) || m.origHeight)
+    var nlw = Math.round(nw / m.scaleFactor)
+    var nlh = Math.round(nh / m.scaleFactor)
+    monitorModel.setProperty(index, "width", nw)
+    monitorModel.setProperty(index, "height", nh)
+    monitorModel.setProperty(index, "lw", nlw)
+    monitorModel.setProperty(index, "lh", nlh)
+    root.checkMonitorMoved(index)
+    root.recomputeView()
+  }
+
+  function setMonitorRefreshRate(index, rr) {
+    var m = monitorModel.get(index)
+    if (!m || m.locked) return
+    var nrr = Math.max(1, parseFloat(rr) || m.origRefreshRate)
+    monitorModel.setProperty(index, "refreshRate", nrr)
+    root.checkMonitorMoved(index)
+  }
+
+  function setMonitorMode(index, modeStr) {
+    var match = String(modeStr || "").match(/^(\d+)x(\d+)(?:@([\d\.]+)Hz)?/)
+    if (match) {
+      var nw = parseInt(match[1])
+      var nh = parseInt(match[2])
+      var nrr = match[3] ? parseFloat(match[3]) : 60
+      root.setMonitorResolution(index, nw, nh)
+      root.setMonitorRefreshRate(index, nrr)
+    }
   }
 
   function syncMovedCount() {
@@ -167,8 +231,7 @@ Item {
       ? bestY : Math.round(m.posY / root.gridStep) * root.gridStep
     monitorModel.setProperty(index, "posX", nx)
     monitorModel.setProperty(index, "posY", ny)
-    monitorModel.setProperty(index, "moved", nx !== m.origX || ny !== m.origY)
-    root.syncMovedCount()
+    root.checkMonitorMoved(index)
   }
 
   function resetLayout() {
@@ -176,6 +239,12 @@ Item {
       var m = monitorModel.get(i)
       monitorModel.setProperty(i, "posX", m.origX)
       monitorModel.setProperty(i, "posY", m.origY)
+      monitorModel.setProperty(i, "width", m.origWidth)
+      monitorModel.setProperty(i, "height", m.origHeight)
+      monitorModel.setProperty(i, "lw", Math.round(m.origWidth / m.origScale))
+      monitorModel.setProperty(i, "lh", Math.round(m.origHeight / m.origScale))
+      monitorModel.setProperty(i, "refreshRate", m.origRefreshRate)
+      monitorModel.setProperty(i, "scaleFactor", m.origScale)
       monitorModel.setProperty(i, "moved", false)
     }
     root.statusText = ""
@@ -188,7 +257,17 @@ Item {
     var payload = []
     for (var i = 0; i < monitorModel.count; i++) {
       var m = monitorModel.get(i)
-      if (!m.locked) payload.push({ name: m.name, x: m.posX, y: m.posY })
+      if (!m.locked) {
+        payload.push({
+          name: m.name,
+          x: m.posX,
+          y: m.posY,
+          width: m.width,
+          height: m.height,
+          refreshRate: m.refreshRate,
+          scale: m.scaleFactor
+        })
+      }
     }
     if (payload.length === 0) return
     root.applying = true
@@ -201,7 +280,7 @@ Item {
 
   Process {
     id: monitorsProc
-    command: ["hyprctl", "monitors", "-j"]
+    command: ["hyprctl", "monitors", "all", "-j"]
     stdout: StdioCollector { id: monitorsOut; waitForEnd: true }
     onExited: root.loadMonitors(monitorsOut.text)
   }
@@ -423,9 +502,9 @@ Item {
               top: layoutHeader.bottom
               left: parent.left
               right: parent.right
-              bottom: footerSep.top
+              bottom: propsSep.top
               topMargin: Style.space(4)
-              bottomMargin: Style.space(10)
+              bottomMargin: Style.space(8)
             }
             radius: Math.max(4, root.cornerRadius - Style.space(4))
             color: Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.04)
@@ -462,17 +541,20 @@ Item {
                 required property bool focused
                 required property bool locked
                 required property bool moved
+                readonly property bool isSelected: root.selectedIndex === monRect.index
 
                 x: root.viewPad + (monRect.posX - root.viewMinX) * root.viewK
                 y: root.viewPad + (monRect.posY - root.viewMinY) * root.viewK
                 width: Math.max(2, monRect.lw * root.viewK)
                 height: Math.max(2, monRect.lh * root.viewK)
                 radius: Math.max(3, root.cornerRadius / 2)
-                color: monRect.focused
-                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.22)
-                  : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08)
-                border.width: monRect.focused || monRect.moved ? Math.max(2, Style.space(1)) : 1
-                border.color: (monRect.focused || monRect.moved) && !monRect.locked
+                color: monRect.isSelected
+                  ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.28)
+                  : (monRect.focused
+                    ? Qt.rgba(Color.accent.r, Color.accent.g, Color.accent.b, 0.18)
+                    : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, 0.08))
+                border.width: monRect.isSelected ? 2 : (monRect.focused || monRect.moved ? Math.max(2, Style.space(1)) : 1)
+                border.color: monRect.isSelected || ((monRect.focused || monRect.moved) && !monRect.locked)
                   ? Color.accent
                   : Qt.rgba(root.foreground.r, root.foreground.g, root.foreground.b, dragArea.containsMouse && !monRect.locked ? 0.5 : 0.3)
                 opacity: monRect.locked ? 0.45 : 1
@@ -495,6 +577,7 @@ Item {
                   property real startLy
 
                   onPressed: function(mouse) {
+                    root.selectedIndex = monRect.index
                     grabMx = mouse.x
                     grabMy = mouse.y
                     startLx = monRect.posX
@@ -518,7 +601,7 @@ Item {
 
                 Text {
                   text: monRect.locked ? "󰁌" : "󰍹"
-                  color: root.dimmed
+                  color: monRect.isSelected ? Color.accent : root.dimmed
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.iconSmall
                   anchors { top: parent.top; left: parent.left; margins: Style.space(4) }
@@ -527,8 +610,8 @@ Item {
 
                 Text {
                   text: "⠿"
-                  color: root.dimmed
-                  opacity: dragArea.containsMouse && !monRect.locked ? 0.9 : 0.35
+                  color: monRect.isSelected ? Color.accent : root.dimmed
+                  opacity: dragArea.containsMouse && !monRect.locked ? 0.9 : (monRect.isSelected ? 0.8 : 0.35)
                   font.family: root.fontFamily
                   font.pixelSize: Style.font.caption
                   anchors { top: parent.top; right: parent.right; margins: Style.space(4) }
@@ -541,7 +624,7 @@ Item {
 
                   Text {
                     text: monRect.name
-                    color: monRect.focused && !monRect.locked ? Color.accent : root.foreground
+                    color: monRect.isSelected || (monRect.focused && !monRect.locked) ? Color.accent : root.foreground
                     font.family: root.fontFamily
                     font.pixelSize: Style.font.title
                     font.weight: Font.Bold
@@ -568,6 +651,180 @@ Item {
                     font.pixelSize: Style.font.caption
                     anchors.horizontalCenter: parent.horizontalCenter
                     visible: monRect.height > Style.space(70)
+                  }
+                }
+              }
+            }
+          }
+
+          // ---------- Display settings section ----------
+          PanelSeparator {
+            id: propsSep
+            anchors {
+              bottom: propsSection.top
+              left: parent.left
+              right: parent.right
+              bottomMargin: Style.space(8)
+            }
+            foreground: root.foreground
+          }
+
+          Item {
+            id: propsSection
+            anchors {
+              bottom: footerSep.top
+              left: parent.left
+              right: parent.right
+              bottomMargin: Style.space(8)
+            }
+            height: propsCol.implicitHeight
+
+            Column {
+              id: propsCol
+              anchors { left: parent.left; right: parent.right; top: parent.top }
+              spacing: Style.space(6)
+
+              Row {
+                width: parent.width
+                spacing: Style.space(8)
+
+                PanelSectionHeader {
+                  text: root.selectedMonitor
+                    ? "SETTINGS · " + root.selectedMonitor.name
+                    : "SETTINGS"
+                  foreground: root.foreground
+                  fontFamily: root.fontFamily
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
+                  text: root.selectedMonitor ? root.selectedMonitor.desc : ""
+                  color: root.dimmed
+                  font.family: root.fontFamily
+                  font.pixelSize: Style.font.caption
+                  elide: Text.ElideRight
+                  width: Math.max(0, parent.width - Style.space(160))
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+              }
+
+              Row {
+                spacing: Style.space(12)
+                anchors.left: parent.left
+                anchors.right: parent.right
+
+                // Resolution Width x Height
+                Row {
+                  spacing: Style.space(4)
+                  anchors.verticalCenter: parent.verticalCenter
+
+                  Text {
+                    text: "Resolution"
+                    color: root.dimmed
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  TextField {
+                    id: resWField
+                    width: Style.space(64)
+                    verticalPadding: Style.space(2)
+                    horizontalPadding: Style.space(6)
+                    font.pixelSize: Style.font.caption
+                    font.family: root.fontFamily
+                    text: root.selectedMonitor ? String(root.selectedMonitor.width) : "1920"
+                    validator: IntValidator { bottom: 320; top: 7680 }
+                    onEditingFinished: {
+                      if (root.selectedMonitor)
+                        root.setMonitorResolution(root.selectedIndex, parseInt(text), root.selectedMonitor.height)
+                    }
+                  }
+
+                  Text {
+                    text: "×"
+                    color: root.dimmed
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  TextField {
+                    id: resHField
+                    width: Style.space(64)
+                    verticalPadding: Style.space(2)
+                    horizontalPadding: Style.space(6)
+                    font.pixelSize: Style.font.caption
+                    font.family: root.fontFamily
+                    text: root.selectedMonitor ? String(root.selectedMonitor.height) : "1080"
+                    validator: IntValidator { bottom: 240; top: 4320 }
+                    onEditingFinished: {
+                      if (root.selectedMonitor)
+                        root.setMonitorResolution(root.selectedIndex, root.selectedMonitor.width, parseInt(text))
+                    }
+                  }
+                }
+
+                // Refresh Rate
+                Row {
+                  spacing: Style.space(4)
+                  anchors.verticalCenter: parent.verticalCenter
+
+                  Text {
+                    text: "Rate"
+                    color: root.dimmed
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  TextField {
+                    id: rrField
+                    width: Style.space(56)
+                    verticalPadding: Style.space(2)
+                    horizontalPadding: Style.space(6)
+                    font.pixelSize: Style.font.caption
+                    font.family: root.fontFamily
+                    text: root.selectedMonitor ? String(root.selectedMonitor.refreshRate) : "60"
+                    validator: DoubleValidator { bottom: 1; top: 500; decimals: 2 }
+                    onEditingFinished: {
+                      if (root.selectedMonitor)
+                        root.setMonitorRefreshRate(root.selectedIndex, parseFloat(text))
+                    }
+                  }
+
+                  Text {
+                    text: "Hz"
+                    color: root.dimmed
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+                }
+
+                // Mode Preset Dropdown
+                Row {
+                  spacing: Style.space(6)
+                  anchors.verticalCenter: parent.verticalCenter
+                  visible: root.selectedMonitor && root.selectedMonitor.availableModes && root.selectedMonitor.availableModes.length > 0
+
+                  Text {
+                    text: "Preset"
+                    color: root.dimmed
+                    font.family: root.fontFamily
+                    font.pixelSize: Style.font.caption
+                    anchors.verticalCenter: parent.verticalCenter
+                  }
+
+                  Dropdown {
+                    id: modeDropdown
+                    width: Style.space(160)
+                    rowHeight: Style.space(24)
+                    options: root.selectedMonitor ? root.selectedMonitor.availableModes : []
+                    value: root.selectedMonitor ? (root.selectedMonitor.width + "x" + root.selectedMonitor.height + "@" + Number(root.selectedMonitor.refreshRate).toFixed(2) + "Hz") : ""
+                    onChanged: function(val) {
+                      if (root.selectedMonitor) root.setMonitorMode(root.selectedIndex, val)
+                    }
                   }
                 }
               }
