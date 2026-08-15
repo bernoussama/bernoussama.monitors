@@ -21,6 +21,13 @@ Item {
   property bool fixXAxis: true
   property int selectedIndex: 0
   readonly property var selectedMonitor: (selectedIndex >= 0 && selectedIndex < monitorModel.count) ? monitorModel.get(selectedIndex) : null
+  onSelectedIndexChanged: {
+    if (root.selectedMonitor) {
+      resWField.text = String(root.selectedMonitor.width)
+      resHField.text = String(root.selectedMonitor.height)
+      rrField.text = String(root.selectedMonitor.refreshRate)
+    }
+  }
   property string fontFamily: Style.font.menuFamily
 
   property color background: Color.menu.background
@@ -252,7 +259,19 @@ Item {
     root.recomputeView()
   }
 
+  function commitActiveInputs() {
+    if (!root.selectedMonitor) return
+    var w = parseInt(resWField.text)
+    var h = parseInt(resHField.text)
+    var rr = parseFloat(rrField.text)
+    if (!isNaN(w) && !isNaN(h) && (w !== root.selectedMonitor.width || h !== root.selectedMonitor.height))
+      root.setMonitorResolution(root.selectedIndex, w, h)
+    if (!isNaN(rr) && rr !== root.selectedMonitor.refreshRate)
+      root.setMonitorRefreshRate(root.selectedIndex, rr)
+  }
+
   function applyLayout() {
+    root.commitActiveInputs()
     if (root.applying || root.movedCount === 0) return
     var payload = []
     for (var i = 0; i < monitorModel.count; i++) {
@@ -735,6 +754,12 @@ Item {
                     font.family: root.fontFamily
                     text: root.selectedMonitor ? String(root.selectedMonitor.width) : "1920"
                     validator: IntValidator { bottom: 320; top: 7680 }
+                    onTextEdited: {
+                      var val = parseInt(text)
+                      if (!isNaN(val) && val >= 320 && root.selectedMonitor) {
+                        root.setMonitorResolution(root.selectedIndex, val, root.selectedMonitor.height)
+                      }
+                    }
                     onEditingFinished: {
                       if (root.selectedMonitor)
                         root.setMonitorResolution(root.selectedIndex, parseInt(text), root.selectedMonitor.height)
@@ -758,6 +783,12 @@ Item {
                     font.family: root.fontFamily
                     text: root.selectedMonitor ? String(root.selectedMonitor.height) : "1080"
                     validator: IntValidator { bottom: 240; top: 4320 }
+                    onTextEdited: {
+                      var val = parseInt(text)
+                      if (!isNaN(val) && val >= 240 && root.selectedMonitor) {
+                        root.setMonitorResolution(root.selectedIndex, root.selectedMonitor.width, val)
+                      }
+                    }
                     onEditingFinished: {
                       if (root.selectedMonitor)
                         root.setMonitorResolution(root.selectedIndex, root.selectedMonitor.width, parseInt(text))
@@ -787,6 +818,12 @@ Item {
                     font.family: root.fontFamily
                     text: root.selectedMonitor ? String(root.selectedMonitor.refreshRate) : "60"
                     validator: DoubleValidator { bottom: 1; top: 500; decimals: 2 }
+                    onTextEdited: {
+                      var val = parseFloat(text)
+                      if (!isNaN(val) && val >= 1 && root.selectedMonitor) {
+                        root.setMonitorRefreshRate(root.selectedIndex, val)
+                      }
+                    }
                     onEditingFinished: {
                       if (root.selectedMonitor)
                         root.setMonitorRefreshRate(root.selectedIndex, parseFloat(text))
@@ -823,7 +860,12 @@ Item {
                     options: root.selectedMonitor ? root.selectedMonitor.availableModes : []
                     value: root.selectedMonitor ? (root.selectedMonitor.width + "x" + root.selectedMonitor.height + "@" + Number(root.selectedMonitor.refreshRate).toFixed(2) + "Hz") : ""
                     onChanged: function(val) {
-                      if (root.selectedMonitor) root.setMonitorMode(root.selectedIndex, val)
+                      if (root.selectedMonitor) {
+                        root.setMonitorMode(root.selectedIndex, val)
+                        resWField.text = String(root.selectedMonitor.width)
+                        resHField.text = String(root.selectedMonitor.height)
+                        rrField.text = String(root.selectedMonitor.refreshRate)
+                      }
                     }
                   }
                 }
