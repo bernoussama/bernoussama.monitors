@@ -329,7 +329,7 @@ Item {
 
               Text {
                 id: headerStatus
-                text: root.movedCount > 0 ? "󰦯 " + root.movedCount + " UNSAVED" : ""
+                text: root.movedCount > 0 ? "● " + root.movedCount + " UNSAVED" : ""
                 color: Color.accent
                 font.family: root.fontFamily
                 font.pixelSize: Style.font.caption
@@ -615,7 +615,7 @@ Item {
 
               Button {
                 text: "Reset"
-                iconText: "󰦯"
+                iconText: "󰑐"
                 fontFamily: root.fontFamily
                 foreground: root.foreground
                 fontSize: Style.font.body
@@ -627,7 +627,8 @@ Item {
 
               Button {
                 text: root.applying ? "Applying…" : "Apply"
-                iconText: root.applying ? "󱥸" : "󰑊"
+                iconText: "󰄬"
+                iconSpinning: root.applying
                 fontFamily: root.fontFamily
                 foreground: root.background
                 background: Color.accent
@@ -639,7 +640,7 @@ Item {
 
               Button {
                 text: "Close"
-                iconText: "󰜗"
+                iconText: "󰅖"
                 fontFamily: root.fontFamily
                 foreground: root.foreground
                 fontSize: Style.font.body
