@@ -351,16 +351,24 @@ Item {
 
           PanelSeparator {
             id: headerSep
-            anchors { top: header.bottom; left: parent.left; right: parent.right }
-            topMargin: Style.space(8)
+            anchors {
+              top: header.bottom
+              left: parent.left
+              right: parent.right
+              topMargin: Style.space(8)
+            }
             foreground: root.foreground
           }
 
           // ---------- Layout section ----------
           Item {
             id: layoutHeader
-            anchors { top: headerSep.bottom; left: parent.left; right: parent.right }
-            topMargin: Style.space(10)
+            anchors {
+              top: headerSep.bottom
+              left: parent.left
+              right: parent.right
+              topMargin: Style.space(10)
+            }
             height: layoutLabel.implicitHeight + Style.space(10)
 
             PanelSectionHeader {
@@ -545,8 +553,12 @@ Item {
           // ---------- Footer ----------
           PanelSeparator {
             id: footerSep
-            anchors { bottom: footer.top; left: parent.left; right: parent.right }
-            bottomMargin: Style.space(8)
+            anchors {
+              bottom: footer.top
+              left: parent.left
+              right: parent.right
+              bottomMargin: Style.space(8)
+            }
             foreground: root.foreground
           }
 
